@@ -3,7 +3,6 @@ import * as game from './game';
 const
     levelnr = game.getQueryVariable("level", "1")
     , level = "map" + levelnr + ".xml"
-	, xqm = document.getElementById('xquery-module').textContent
     ;
 
 game.load_sounds(
@@ -16,7 +15,6 @@ game.load_sounds(
     ]
 );
 game.game(
-	xqm,
 	{ tm: "http://mansoft.nl/tilemathics" },
 	level,
 	levelnr,

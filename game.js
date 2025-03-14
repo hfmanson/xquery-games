@@ -71,10 +71,11 @@ export const
 	, play_sound = (name) => {
 		webaudios.playSound(name);
 	}
-	, game = (xqm, moduleImports, level, levelnr, load_xq, events) => {
+	, game = (moduleImports, level, levelnr, load_xq, events) => {
 		addEventListener("DOMContentLoaded", (e) => {
 			const
-				ns_xqib = 'http://mansoft.nl/xqib'
+				xqm = document.getElementById('xquery-module').textContent
+				, ns_xqib = 'http://mansoft.nl/xqib'
 				, URI_BY_PREFIX = {
 					 b: ns_xqib
 				}
