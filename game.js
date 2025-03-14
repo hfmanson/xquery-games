@@ -71,7 +71,7 @@ export const
 	, play_sound = (name) => {
 		webaudios.playSound(name);
 	}
-	, game = (level, levelnr, load_xq, events) => {
+	, game = (xqm, moduleImports, level, levelnr, load_xq, events) => {
 		addEventListener("DOMContentLoaded", (e) => {
 			const
 				ns_xqib = 'http://mansoft.nl/xqib'
@@ -93,6 +93,7 @@ export const
 				}
 				, req = new XMLHttpRequest()
 				, reqListener = (e) => {
+					fontoxpath.registerXQueryModule(xqm);					
 					const leveldoc = e.target.responseXML;
 					const result = fontoxpath.evaluateUpdatingExpressionSync(
 						load_xq
@@ -105,7 +106,8 @@ export const
 						}
 						,
 						{
-							namespaceResolver: (prefix) => URI_BY_PREFIX[prefix]
+							namespaceResolver: (prefix) => URI_BY_PREFIX[prefix],
+							moduleImports: moduleImports
 						}
 					);
 					fontoxpath.executePendingUpdateList(result.pendingUpdateList);
@@ -132,7 +134,8 @@ export const
 								}
 								,
 								{
-									namespaceResolver: (prefix) => URI_BY_PREFIX[prefix]
+									namespaceResolver: (prefix) => URI_BY_PREFIX[prefix],
+									moduleImports: moduleImports
 								}
 							);
 							fontoxpath.executePendingUpdateList(result.pendingUpdateList);
