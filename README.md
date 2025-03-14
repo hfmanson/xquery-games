@@ -5,17 +5,17 @@ SVG games using a XQuery Update Facility game engine based on [xfontopath](https
     import * as game from './game';
 
     const
-		// get levernr from level=5 URL query string
+        // get levelnr from URL query string
         levelnr = game.getQueryVariable("level", "1")
-		// convert level number to URL containing an XML game level
+        // convert level number to URL containing an XML game level
         , level = "chain-level" + levelnr + ".xml"
-		// get XQuery module from script text node
+        // get XQuery module from script text node
         , xqm = document.getElementById('xquery-module').textContent
         ;
 
     game.game(
         xqm,
-		// module imports
+        // module imports
         { chain: "http://mansoft.nl/chain" },
         level,
         levelnr,
