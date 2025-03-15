@@ -10,7 +10,5 @@ game.game(
 	level,
 	levelnr,
 	'boxup:load-svg()',
-	{
-		keydown: 'boxup:keydown-svg()'
-	}
+	'boxup:add-listeners()'
 );

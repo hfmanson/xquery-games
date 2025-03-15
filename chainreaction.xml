@@ -14,7 +14,6 @@ declare namespace svg="http://www.w3.org/2000/svg";
 declare namespace xlink="http://www.w3.org/1999/xlink";
 declare namespace b="http://mansoft.nl/xqib";
 
-declare variable $webdoc external;
 declare variable $leveldoc external;
 declare variable $levelnr external;
 declare variable $event external;
@@ -34,11 +33,11 @@ declare %updating function chain:load-svg() {
         , $chain-field := $chainreaction/chain:field
         , $columns := xs:integer($chainreaction/@columns)
         , $rows := xs:integer($chainreaction/@rows)
-		, $svg := $webdoc/svg:svg
+		, $svg := b:dom()/svg:svg
     return
     (
         replace value of node $svg/@viewBox with concat("0 0 ", $columns * 10 + 2, " ", $rows * 10 + 2),
-        replace node $webdoc/svg:svg/svg:title/text() with concat("Chainreaction level ", $levelnr),
+        replace node b:dom()/svg:svg/svg:title/text() with concat("Chainreaction level ", $levelnr),
         (
         for $row in 1 to $rows, $column in 1 to $columns
             let
@@ -86,6 +85,10 @@ declare %updating function chain:click-svg($use) {
         ()
 };
 
+declare %updating function chain:add-listeners() {
+	b:addEventListener(b:dom()//svg:svg, "click", "chain:click-svg(.)")
+};
+	
 ]]>
 	</script>
 	<defs>

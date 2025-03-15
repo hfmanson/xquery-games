@@ -19,7 +19,5 @@ game.game(
 	level,
 	levelnr,
 	'tm:load-svg()',
-	{
-		keydown: 'tm:keydown-svg()'
-	}
+	'tm:add-listeners()'
 );

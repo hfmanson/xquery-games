@@ -71,80 +71,56 @@ export const
 	, play_sound = (name) => {
 		webaudios.playSound(name);
 	}
-	, game = (moduleImports, level, levelnr, load_xq, events) => {
+	, game = (moduleImports, level, levelnr, load_xq, loaded_xq) => {
 		addEventListener("DOMContentLoaded", (e) => {
+			e.preventDefault();
+			let
+				leveldoc
+				;
 			const
 				xqm = document.getElementById('xquery-module').textContent
 				, ns_xqib = 'http://mansoft.nl/xqib'
 				, URI_BY_PREFIX = {
 					 b: ns_xqib
 				}
-				, getEventXML = (e) => {
-					const
-						eventdata = {
-							click : [],
-							keydown: [ 'key' ]
-						}
-						, eventElement = document.createElement("event")
-						;
-					for (const data of eventdata[e.type]) {
-						eventElement.setAttribute(data, e[data]);
-					}
-					return eventElement;
-				}
-				, req = new XMLHttpRequest()
-				, reqListener = (e) => {
-					fontoxpath.registerXQueryModule(xqm);					
-					const leveldoc = e.target.responseXML;
+				, evaluateUpdatingExpression = (xquery, contextNode, variables) => {
 					const result = fontoxpath.evaluateUpdatingExpressionSync(
-						load_xq
-						, document
+						xquery
+						, contextNode
 						, null
+						, variables
 						, {
-							webdoc: document,
-							leveldoc: leveldoc,
-							levelnr: levelnr
-						}
-						,
-						{
 							namespaceResolver: (prefix) => URI_BY_PREFIX[prefix],
 							moduleImports: moduleImports
 						}
 					);
 					fontoxpath.executePendingUpdateList(result.pendingUpdateList);
-					const xqueryx = {};
-					for (const [key, value] of Object.entries(events)) {
-						console.log(`${key}: ${value}`);
-						xqueryx[key] = fontoxpath.parseScript(
-							value,
-							{
-								language: fontoxpath.evaluateXPath.XQUERY_3_1_LANGUAGE,
-							},
-							document
-						);
-						document.documentElement.addEventListener(key, (e) => {
-							const result = fontoxpath.evaluateUpdatingExpressionSync(
-								xqueryx[e.type]
-								, e.target
-								, null
-								,
-								{
-									webdoc: document,
-									leveldoc: leveldoc,
-									event: getEventXML(e)
-								}
-								,
-								{
-									namespaceResolver: (prefix) => URI_BY_PREFIX[prefix],
-									moduleImports: moduleImports
-								}
-							);
-							fontoxpath.executePendingUpdateList(result.pendingUpdateList);
-						}, false);
-					}
+				}
+				, evaluateUpdatingExpressionInit = (xquery) => {
+					evaluateUpdatingExpression(xquery, document, {
+							leveldoc: leveldoc,
+							levelnr: levelnr						
+					});
+				}
+				, req = new XMLHttpRequest()
+				, reqListener = (e) => {
+					fontoxpath.registerXQueryModule(xqm);					
+					leveldoc = e.target.responseXML;
+					evaluateUpdatingExpressionInit(load_xq);
+					evaluateUpdatingExpressionInit(loaded_xq);
 				}	
 				;
 				
+			// Register a function called 'dom' in the 'b' namespace:
+			fontoxpath.registerCustomXPathFunction(
+				{
+					namespaceURI: ns_xqib,
+					localName: 'dom'
+				}
+				, [ ]
+				, 'node()'
+				, (_) => { return document; }
+			);
 			// Register a function called 'alert' in the 'b' namespace:
 			fontoxpath.registerCustomXPathFunction(
 				{
@@ -154,6 +130,49 @@ export const
 				, [ 'xs:string' ]
 				, 'xs:string'
 				, (_, str) => { alert(str); return str }
+			);
+			// Register a function called 'addEventListener' in the 'b' namespace:
+			fontoxpath.registerCustomXPathFunction(
+				{
+					namespaceURI: ns_xqib,
+					localName: 'addEventListener'
+				}
+				, [ 'element()', 'xs:string', 'xs:string' ]
+				, 'xs:string'
+				, (_, where, kind, listener) => {
+					where.addEventListener(kind, (e) => {
+						const
+							getEventXML = (e) => {
+								const
+									eventdata = {
+										click : [],
+										mousedown : [],
+										mouseup : [],
+										pointerdown : [],
+										pointerup : [],
+										pointerenter : [ 'buttons' ],
+										touchstart : [],
+										touchend : [],
+										keydown: [ 'key' ]
+									}
+									, eventElement = document.createElement("event")
+									;
+								for (const data of eventdata[e.type]) {
+									eventElement.setAttribute(data, e[data]);
+								}
+								return eventElement;
+							}
+							;
+							
+						console.log(e.type);
+						console.log(e.target);
+						evaluateUpdatingExpression(listener, e.target, {
+							leveldoc: leveldoc,
+							event: getEventXML(e)
+						});
+					}, false);
+					return "";
+				}
 			);
 			// Register a function called 'play-sound' in the 'b' namespace:
 			fontoxpath.registerCustomXPathFunction(

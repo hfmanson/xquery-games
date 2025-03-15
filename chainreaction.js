@@ -10,8 +10,6 @@ game.game(
 	level,
 	levelnr,
 	'chain:load-svg()',
-	{
-		click: 'chain:click-svg(.)'
-	}
+	'chain:add-listeners()',
 );
 

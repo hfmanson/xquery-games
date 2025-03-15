@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet href="style.css" type="text/css"?>
 <svg
     xmlns="http://www.w3.org/2000/svg"
     xmlns:svg="http://www.w3.org/2000/svg"
@@ -16,7 +18,6 @@ declare namespace xlink="http://www.w3.org/1999/xlink";
 declare namespace svg="http://www.w3.org/2000/svg";
 declare namespace b="http://mansoft.nl/xqib";
 
-declare variable $webdoc external;
 declare variable $leveldoc external;
 declare variable $levelnr external;
 declare variable $event external;
@@ -115,7 +116,7 @@ declare function tm:process-field($x as xs:integer, $y as xs:integer, $layer as 
     return
         <tm:field layer="{$layer}" x="{$x}" y="{$y}">        
           {
-            if (not(empty($tilemathics-attributes))) then attribute id { concat('l', $layer, '-x', $x, '-y', $y) } else (),
+            attribute id { concat('l', $layer, '-x', $x, '-y', $y) },
             $tilemathics-attributes
           }
         </tm:field>
@@ -124,7 +125,7 @@ declare function tm:process-field($x as xs:integer, $y as xs:integer, $layer as 
 declare function tm:process-tilemathics-field($field as element(), $selected as xs:boolean*) as element()* {
 <g xmlns="http://www.w3.org/2000/svg" transform="translate({($field/@x - 1) * 10 + 1}, {($field/@y - 1) * 10 + 1})">
 {
-    if (not(empty($field/@id))) then (attribute id {$field/@id}) else (),
+    attribute id {$field/@id},
     <use xmlns="http://www.w3.org/2000/svg" xlink:href="#square" stroke='black' fill="{if ($field/@layer = 1) then 'green' else if ($selected = true()) then 'orange' else 'yellow'}"/>,
     if (not(empty($field/@symbol))) then
         tm:create-text($field/@symbol, $field/@color)
@@ -158,7 +159,7 @@ declare function tm:copy-model($level) {
          for $x in 1 to $levelWidth
            let $field := xs:integer($fieldvalues[$x])
            return
-             if ($field != 0) then tm:process-field($x, $y, $position, $field) else ()    
+             if ($field != 0) then tm:process-field($x, $y, $position, $field) else ()
     }
     </tm:level>
   (: select first mover :)
@@ -171,11 +172,11 @@ declare %updating function tm:load-svg() {
     $model := tm:copy-model($leveldoc/Level)
     , $layer1 := $model/tm:field[@layer = '1']
     , $layer2 := $model/tm:field[@layer = '2']
-	, $svg := $webdoc/svg:svg
+	, $svg := b:dom()/svg:svg
   return
   (
     replace value of node $svg/@viewBox with concat("0 0 ", data($model/@width) * 10 + 2, " ", data($model/@height) * 10 + 2),
-    replace node $webdoc/svg:svg/svg:title/text() with concat("Tilemathics level ", $levelnr),
+    replace node $svg/svg:title/text() with concat("Tilemathics level ", $levelnr),
     insert node tm:process-tilemathics-fields($layer1) as last into $svg,
     insert node tm:process-tilemathics-fields($layer2[not(@type = 'mover')]) as last into $svg,
     insert node tm:process-tilemathics-fields($layer2[@type = 'mover']) as last into $svg,
@@ -189,7 +190,7 @@ declare function tm:get-transform($x as xs:integer, $y as xs:integer) as xs:stri
 };
 
 declare function tm:get-svg-element($id as xs:string) as element() {
-    $webdoc/svg:svg/svg:g[@id = $id]
+    b:dom()/svg:svg/svg:g[@id = $id]
 };
 
 declare function tm:incr-decr-new-value($new-field as element(), $dx as xs:integer, $dy as xs:integer) as xs:integer {
@@ -291,7 +292,6 @@ declare %updating function tm:move($mover as element(), $dx as xs:integer, $dy a
                             tm:update-mover($mover, $updated-mover-value, $x, $y),
                             if (xs:boolean($new-field/@remove)) then
                             (
-                                delete node $new-field/@id,
                                 delete node $new-field/@field,
                                 delete node $new-field/@type,
                                 delete node $new-field/@symbol,
@@ -404,6 +404,56 @@ declare %updating function tm:keydown-svg() {
             , $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
         return tm:select-mover($mover, if (empty($next-mover)) then $movers[1] else $next-mover)
     )
+};
+
+declare %updating function tm:pointerdown-svg($use) {
+	let
+        $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
+		, $current-mover := $movers[@selected = true()]
+		, $id := $use/../@id
+		, $new-mover := $movers[@id = $id]
+	return if (empty($new-mover)) then () else tm:select-mover($current-mover, $new-mover)
+};
+
+declare %updating function tm:pointerenter-svg($use) {
+	let $buttons := trace($event/@buttons, 'buttons')
+	return if ($buttons != 0) then (	
+		let
+			$movers := $leveldoc/tm:level/tm:field[@type = 'mover']
+			, $current-mover := $movers[@selected = true()]
+			, $cm-x := trace($current-mover/@x, 'cm-x')
+			, $cm-y := trace($current-mover/@y, 'cm-y')
+			, $id := trace($use/@id, 'id')
+			, $new-mover := $movers[@id = $id]
+			, $field := $leveldoc/tm:level/tm:field[@id = $id]
+			, $dx := trace($field/@x - $cm-x, 'dx')
+			, $dy := trace($field/@y - $cm-y, 'dy')
+			, $abs-dx := abs($dx)
+			, $abs-dy := abs($dy)
+			return if ($abs-dx = 0 and $abs-dy = 0 ) then
+				()
+			else if ($abs-dx > $abs-dy) then
+				tm:move($current-mover, if ($dx > 0) then 1 else -1, 0)
+			else
+				tm:move($current-mover, 0, if ($dy > 0) then 1 else -1)
+	) else
+		()
+};
+
+declare %updating function tm:pointercancel-svg($use) {
+	let $dummy := trace($use/local-name(), 'pointercancel')
+	return ()
+};
+
+declare %updating function tm:add-listeners() {
+	b:addEventListener(b:dom()//svg:svg, "keydown", "tm:keydown-svg()"),
+	for $g as element() in b:dom()//svg:g
+	return
+	(
+		b:addEventListener($g, "pointerdown", "tm:pointerdown-svg(.)"),
+		b:addEventListener($g, "pointercancel", "tm:pointercancel-svg(.)"),
+		b:addEventListener($g, "pointerenter", "tm:pointerenter-svg(.)")
+	)
 };
 
 ]]>
