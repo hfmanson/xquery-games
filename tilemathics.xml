@@ -175,6 +175,13 @@ declare %updating function tm:load-svg() {
 	, $svg := b:dom()/svg:svg
   return
   (
+    b:load-sounds(map {
+      "move" : "move.wav",
+      "lock" : "lock.wav",
+      "wrong" : "wrong.wav",
+      "tick" : "tick.wav",
+      "winner" : "winner.wav"
+    }),
     replace value of node $svg/@viewBox with concat("0 0 ", data($model/@width) * 10 + 2, " ", data($model/@height) * 10 + 2),
     replace node $svg/svg:title/text() with concat("Tilemathics level ", $levelnr),
     insert node tm:process-tilemathics-fields($layer1) as last into $svg,

@@ -3,17 +3,18 @@
 import * as fontoxpath from 'fontoxpath';
 
 function BufferLoader(sounds) {
-    if (sounds.length > 0) {
+	const entries = Object.entries(sounds);
+    if (entries.length > 0) {
         this.context = new window.AudioContext;
-        this.sounds = sounds;
-        for (const sound of sounds) {
-            this.loadBuffer(sound);
+        this.sounds = entries;
+        for (const entry of entries) {
+            this.loadBuffer(entry);
 		}
     }
 	return this;
 }
 
-BufferLoader.prototype.loadBuffer = function(sound) {
+BufferLoader.prototype.loadBuffer = function(entry) {
     // Load buffer asynchronously
     const
 		request = new XMLHttpRequest()
@@ -27,17 +28,17 @@ BufferLoader.prototype.loadBuffer = function(sound) {
 			request.response,
 			function(buffer) {
 				if (!buffer) {
-					alert('error decoding file data: ' + sound.href);
+					alert('error decoding file data: ' + entry[1]);
 					return;
 				}
-				loader.sounds[sound.name] = buffer;
+				loader.sounds[entry[0]] = buffer;
 			}
         );
     };
     request.onerror = function() {
         alert('BufferLoader: XHR error');
     };
-    request.open("GET", sound.href, true);
+    request.open("GET", entry[1], true);
     request.send();
 };
 
@@ -64,12 +65,6 @@ export const
 			}
 		}
 		return decodeURIComponent(defval);
-	}
-	, load_sounds = (sounds) => {
-		webaudios = new BufferLoader(sounds)
-	}
-	, play_sound = (name) => {
-		webaudios.playSound(name);
 	}
 	, game = (moduleImports, level, levelnr, load_xq, loaded_xq) => {
 		addEventListener("DOMContentLoaded", (e) => {
@@ -111,6 +106,26 @@ export const
 				}	
 				;
 				
+			// Register a function called 'load-sounds' in the 'b' namespace:
+			fontoxpath.registerCustomXPathFunction(
+				{
+					namespaceURI: ns_xqib,
+					localName: 'load-sounds'
+				}
+				, [ 'map(*)' ]
+				, 'xs:string'
+				, (_, sounds) => { webaudios = new BufferLoader(sounds); return ""; }
+			);
+			// Register a function called 'play-sound' in the 'b' namespace:
+			fontoxpath.registerCustomXPathFunction(
+				{
+					namespaceURI: ns_xqib,
+					localName: 'play-sound'
+				}
+				, ['xs:string']
+				, 'xs:string'
+				, (_, sound) => { webaudios.playSound(sound); return "" }
+			);
 			// Register a function called 'dom' in the 'b' namespace:
 			fontoxpath.registerCustomXPathFunction(
 				{
@@ -118,7 +133,7 @@ export const
 					localName: 'dom'
 				}
 				, [ ]
-				, 'node()'
+				, 'document-node()'
 				, (_) => { return document; }
 			);
 			// Register a function called 'alert' in the 'b' namespace:
@@ -173,16 +188,6 @@ export const
 					}, false);
 					return "";
 				}
-			);
-			// Register a function called 'play-sound' in the 'b' namespace:
-			fontoxpath.registerCustomXPathFunction(
-				{
-					namespaceURI: ns_xqib,
-					localName: 'play-sound'
-				}
-				, ['xs:string']
-				, 'xs:string'
-				, (_, sound) => { play_sound(sound); return sound }
 			);
 
 			req.addEventListener("load", reqListener);
