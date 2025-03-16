@@ -21,6 +21,7 @@ declare namespace b="http://mansoft.nl/xqib";
 declare variable $leveldoc external;
 declare variable $levelnr external;
 declare variable $event external;
+declare variable $current-target external;
 
 declare variable $tilemathics-fields :=
 <tm:fields>
@@ -413,28 +414,28 @@ declare %updating function tm:keydown-svg() {
     )
 };
 
-declare %updating function tm:pointerdown-svg($use) {
+declare %updating function tm:pointerdown-svg($g) {
 	let
         $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
 		, $current-mover := $movers[@selected = true()]
-		, $id := $use/../@id
+		, $id := $g/@id
 		, $new-mover := $movers[@id = $id]
 	return if (empty($new-mover)) then () else tm:select-mover($current-mover, $new-mover)
 };
 
-declare %updating function tm:pointerenter-svg($use) {
-	let $buttons := trace($event/@buttons, 'buttons')
+declare %updating function tm:pointerenter-svg($g) {
+	let $buttons := $event/@buttons
 	return if ($buttons != 0) then (	
 		let
 			$movers := $leveldoc/tm:level/tm:field[@type = 'mover']
 			, $current-mover := $movers[@selected = true()]
-			, $cm-x := trace($current-mover/@x, 'cm-x')
-			, $cm-y := trace($current-mover/@y, 'cm-y')
-			, $id := trace($use/@id, 'id')
+			, $cm-x := $current-mover/@x
+			, $cm-y := $current-mover/@y
+			, $id := $g/@id
 			, $new-mover := $movers[@id = $id]
 			, $field := $leveldoc/tm:level/tm:field[@id = $id]
-			, $dx := trace($field/@x - $cm-x, 'dx')
-			, $dy := trace($field/@y - $cm-y, 'dy')
+			, $dx := $field/@x - $cm-x
+			, $dy := $field/@y - $cm-y
 			, $abs-dx := abs($dx)
 			, $abs-dy := abs($dy)
 			return if ($abs-dx = 0 and $abs-dy = 0 ) then
@@ -447,8 +448,8 @@ declare %updating function tm:pointerenter-svg($use) {
 		()
 };
 
-declare %updating function tm:pointercancel-svg($use) {
-	let $dummy := trace($use/local-name(), 'pointercancel')
+declare %updating function tm:pointercancel-svg($g) {
+	let $dummy := $g/local-name()
 	return ()
 };
 
@@ -457,9 +458,9 @@ declare %updating function tm:add-listeners() {
 	for $g as element() in b:dom()//svg:g
 	return
 	(
-		b:addEventListener($g, "pointerdown", "tm:pointerdown-svg(.)"),
-		b:addEventListener($g, "pointercancel", "tm:pointercancel-svg(.)"),
-		b:addEventListener($g, "pointerenter", "tm:pointerenter-svg(.)")
+		b:addEventListener($g, "pointerdown", "tm:pointerdown-svg($current-target)"),
+		b:addEventListener($g, "pointercancel", "tm:pointercancel-svg($current-target)"),
+		b:addEventListener($g, "pointerenter", "tm:pointerenter-svg($current-target)")
 	)
 };
 

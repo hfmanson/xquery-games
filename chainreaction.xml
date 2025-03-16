@@ -17,6 +17,7 @@ declare namespace b="http://mansoft.nl/xqib";
 declare variable $leveldoc external;
 declare variable $levelnr external;
 declare variable $event external;
+declare variable $target external;
 
 declare function chain:process-field($row, $column, $field ) {
   let $x := ($column - 1) * 10 + 1
@@ -86,7 +87,7 @@ declare %updating function chain:click-svg($use) {
 };
 
 declare %updating function chain:add-listeners() {
-	b:addEventListener(b:dom()//svg:svg, "click", "chain:click-svg(.)")
+	b:addEventListener(b:dom()//svg:svg, "click", "chain:click-svg($target)")
 };
 	
 ]]>

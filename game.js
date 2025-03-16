@@ -104,6 +104,37 @@ export const
 					evaluateUpdatingExpressionInit(load_xq);
 					evaluateUpdatingExpressionInit(loaded_xq);
 				}	
+				, getEventXML = (e) => {
+					const
+						eventdata = {
+							click : [],
+							mousedown : [],
+							mouseup : [],
+							pointerdown : [],
+							pointerup : [],
+							pointerenter : [ 'buttons' ],
+							touchstart : [],
+							touchend : [],
+							keydown: [ 'key' ]
+						}
+						, eventElement = document.createElement("event")
+						;
+					for (const data of eventdata[e.type]) {
+						eventElement.setAttribute(data, e[data]);
+					}
+					return eventElement;
+				}
+				, eventHandler = (e) => {
+					console.log('type', e.type);
+					console.log('target', e.target);
+					console.log('currentTarget', e.currentTarget);
+					evaluateUpdatingExpression(e.currentTarget.xqueries[e.type], document, {
+						"leveldoc": leveldoc,
+						"event": getEventXML(e),
+						"target": e.target,
+						"current-target": e.currentTarget
+					});
+				}
 				;
 				
 			// Register a function called 'load-sounds' in the 'b' namespace:
@@ -155,37 +186,11 @@ export const
 				, [ 'element()', 'xs:string', 'xs:string' ]
 				, 'xs:string'
 				, (_, where, kind, listener) => {
-					where.addEventListener(kind, (e) => {
-						const
-							getEventXML = (e) => {
-								const
-									eventdata = {
-										click : [],
-										mousedown : [],
-										mouseup : [],
-										pointerdown : [],
-										pointerup : [],
-										pointerenter : [ 'buttons' ],
-										touchstart : [],
-										touchend : [],
-										keydown: [ 'key' ]
-									}
-									, eventElement = document.createElement("event")
-									;
-								for (const data of eventdata[e.type]) {
-									eventElement.setAttribute(data, e[data]);
-								}
-								return eventElement;
-							}
-							;
-							
-						console.log(e.type);
-						console.log(e.target);
-						evaluateUpdatingExpression(listener, e.target, {
-							leveldoc: leveldoc,
-							event: getEventXML(e)
-						});
-					}, false);
+					if (!where.xqueries) {
+						where.xqueries = {};
+					}
+					where.xqueries[kind] = listener;
+					where.addEventListener(kind, eventHandler, false);
 					return "";
 				}
 			);
