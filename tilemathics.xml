@@ -3,6 +3,7 @@
 <svg
     xmlns="http://www.w3.org/2000/svg"
     xmlns:svg="http://www.w3.org/2000/svg"
+    xmlns:xhtml="http://www.w3.org/1999/xhtml"
     xmlns:xlink="http://www.w3.org/1999/xlink"
     xmlns:tm="http://mansoft.nl/tilemathics" 
     width="100%"
@@ -10,7 +11,12 @@
     viewBox="0 0 12 12"
 >
     <title>Tilemathics</title>
-	<script type="module" xlink:href="tilemathics.js"></script>
+    <xhtml:audio id="move" src="move.wav"/>
+    <xhtml:audio id="lock" src="lock.wav"/>
+    <xhtml:audio id="wrong" src="wrong.wav"/>
+    <xhtml:audio id="tick" src="tick.wav"/>
+    <xhtml:audio id="winner" src="winner.wav"/>
+	<script type="module" xlink:href="xqib.js"/>
 	<script id="xquery-module" type="application/xquery">
 <![CDATA[
 module namespace tm="http://mansoft.nl/tilemathics";
@@ -18,10 +24,9 @@ declare namespace xlink="http://www.w3.org/1999/xlink";
 declare namespace svg="http://www.w3.org/2000/svg";
 declare namespace b="http://mansoft.nl/xqib";
 
-declare variable $leveldoc external;
-declare variable $levelnr external;
+declare variable $levelnr := tm:get-level();
+declare variable $leveldoc := b:doc(concat("map", $levelnr, ".xml"));
 declare variable $event external;
-declare variable $current-target external;
 
 declare variable $tilemathics-fields :=
 <tm:fields>
@@ -127,7 +132,7 @@ declare function tm:process-tilemathics-field($field as element(), $selected as 
 <g xmlns="http://www.w3.org/2000/svg" transform="translate({($field/@x - 1) * 10 + 1}, {($field/@y - 1) * 10 + 1})">
 {
     attribute id {$field/@id},
-    <use xmlns="http://www.w3.org/2000/svg" xlink:href="#square" stroke='black' fill="{if ($field/@layer = 1) then 'green' else if ($selected = true()) then 'orange' else 'yellow'}"/>,
+    <use xmlns="http://www.w3.org/2000/svg" xlink:href="#square" stroke='black' fill="{if ($field/@layer = 1) then 'green' else if ($selected = true()) then 'orange' else 'yellow'}"/>,    
     if (not(empty($field/@symbol))) then
         tm:create-text($field/@symbol, $field/@color)
     else if (not(empty($field/@use-id))) then
@@ -168,26 +173,25 @@ declare function tm:copy-model($level) {
   return $model
 };
 
-declare %updating function tm:load-svg() {
+declare function tm:get-body($model) {
+  let $layer1 := $model/tm:field[@layer = '1']
+      , $layer2 := $model/tm:field[@layer = '2']
+    return (
+      tm:process-tilemathics-fields($layer1),
+      tm:process-tilemathics-fields($layer2[not(@type = 'mover')]),
+      tm:process-tilemathics-fields($layer2[@type = 'mover'])
+    )
+};
+
+declare %updating function tm:update-svg() {
   let
     $model := tm:copy-model($leveldoc/Level)
-    , $layer1 := $model/tm:field[@layer = '1']
-    , $layer2 := $model/tm:field[@layer = '2']
 	, $svg := b:dom()/svg:svg
   return
   (
-    b:load-sounds(map {
-      "move" : "move.wav",
-      "lock" : "lock.wav",
-      "wrong" : "wrong.wav",
-      "tick" : "tick.wav",
-      "winner" : "winner.wav"
-    }),
     replace value of node $svg/@viewBox with concat("0 0 ", data($model/@width) * 10 + 2, " ", data($model/@height) * 10 + 2),
     replace node $svg/svg:title/text() with concat("Tilemathics level ", $levelnr),
-    insert node tm:process-tilemathics-fields($layer1) as last into $svg,
-    insert node tm:process-tilemathics-fields($layer2[not(@type = 'mover')]) as last into $svg,
-    insert node tm:process-tilemathics-fields($layer2[@type = 'mover']) as last into $svg,
+    insert node tm:get-body($model) as last into $svg,
     replace node $leveldoc/Level with $model
   )  
 };
@@ -399,13 +403,15 @@ declare %updating function tm:move($mover as element(), $dx as xs:integer, $dy a
 };
 
 declare %updating function tm:keydown-svg() {
-  let $key := $event/@key
+  let $key := trace(b:get($event, 'key'))
       , $mover := $leveldoc/tm:level/tm:field[@type = 'mover'][@selected = 'true']
   return
     if ($key = 'ArrowLeft') then tm:move($mover, -1, 0) else
     if ($key = 'ArrowRight') then tm:move($mover, 1, 0) else
     if ($key = 'ArrowUp') then tm:move($mover, 0, -1) else
     if ($key = 'ArrowDown') then tm:move($mover, 0, 1) else
+    if ($key = 'n') then (if ($levelnr < 59) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
+    if ($key = 'p') then (if ($levelnr > 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
     (
         let
             $next-mover := $mover/following-sibling::tm:field[@type = 'mover'][1]
@@ -414,17 +420,19 @@ declare %updating function tm:keydown-svg() {
     )
 };
 
-declare %updating function tm:pointerdown-svg($g) {
+declare %updating function tm:pointerdown-svg() {
 	let
-        $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
+        $g := b:get($event, 'currentTarget')
+        , $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
 		, $current-mover := $movers[@selected = true()]
 		, $id := $g/@id
 		, $new-mover := $movers[@id = $id]
 	return if (empty($new-mover)) then () else tm:select-mover($current-mover, $new-mover)
 };
 
-declare %updating function tm:pointerenter-svg($g) {
-	let $buttons := $event/@buttons
+declare %updating function tm:pointerenter-svg() {
+	let $buttons := trace(b:get($event, 'buttons'))
+        , $g := trace(b:get($event, 'currentTarget'))
 	return if ($buttons != 0) then (	
 		let
 			$movers := $leveldoc/tm:level/tm:field[@type = 'mover']
@@ -449,7 +457,8 @@ declare %updating function tm:pointerenter-svg($g) {
 };
 
 declare %updating function tm:pointercancel-svg($g) {
-	let $dummy := $g/local-name()
+	let $g := b:get($event, 'currentTarget')
+        , $dummy := $g/local-name()
 	return ()
 };
 
@@ -458,14 +467,33 @@ declare %updating function tm:add-listeners() {
 	for $g as element() in b:dom()//svg:g
 	return
 	(
-		b:addEventListener($g, "pointerdown", "tm:pointerdown-svg($current-target)"),
-		b:addEventListener($g, "pointercancel", "tm:pointercancel-svg($current-target)"),
-		b:addEventListener($g, "pointerenter", "tm:pointerenter-svg($current-target)")
+		b:addEventListener($g, "pointerdown", "tm:pointerdown-svg()"),
+		b:addEventListener($g, "pointercancel", "tm:pointercancel-svg()"),
+		b:addEventListener($g, "pointerenter", "tm:pointerenter-svg()")
 	)
+};
+
+declare function tm:get-level() as xs:integer {
+    let $search := b:location("search")
+    return
+        if (starts-with($search, '?level=')) then
+            xs:integer(substring($search, 8))
+        else
+            1
 };
 
 ]]>
 	</script>
+    <script id="xquery-main" type="application/xquery" after-update="add-listeners">
+<![CDATA[
+    tm:update-svg()
+]]>
+    </script>
+    <script id="add-listeners" type="application/xquery">
+<![CDATA[
+    tm:add-listeners()
+]]>
+    </script>
 	<defs>
         <g id="square">
             <rect width="10" height="10" stroke-width="0.5"/>

@@ -56,6 +56,6 @@ const copySVG = (app) => {
 	});
 }
 
-for (const app of [ 'chainreaction', 'boxup', 'tilemathics']) {
+for (const app of [ 'chainreaction', 'boxup', 'tilemathics', 'unblock' ]) {
 	copySVG(app);
 }

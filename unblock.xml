@@ -1,0 +1,246 @@
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:unblock="http://mansoft.nl/unblock" width="100%" height="100%" viewBox="-0.1 -0.1 6.2 7.2" style="touch-action:none; user-select:none;">
+  <title>Unblock me</title>
+	<script type="module" xlink:href="xqib.js"></script>
+	<script id="xquery-module" type="application/xquery">
+<![CDATA[
+module namespace unblock="http://mansoft.nl/unblock";
+
+declare namespace svg="http://www.w3.org/2000/svg";
+declare namespace xlink="http://www.w3.org/1999/xlink";
+declare namespace b="http://mansoft.nl/xqib";
+
+declare variable $levelnr := unblock:get-level();
+declare variable $leveldoc := b:doc(concat("unblock", $levelnr, ".xml"));
+declare variable $event external;
+
+declare function unblock:get-level() as xs:integer {
+    let $search := b:location("search")
+    return
+        if (starts-with($search, '?level=')) then
+            xs:integer(substring($search, 8))
+        else
+            1
+};
+
+declare function unblock:get-body() {
+  for $block as element(unblock:block) in $leveldoc/unblock:level/unblock:block
+    let 
+        $column := xs:integer($block/@column)
+      , $row := xs:integer($block/@row)
+      , $isHorizontal := xs:boolean($block/@isHorizontal)
+      , $isPlayer := xs:boolean($block/@isPlayer)
+      , $length := xs:integer($block/@length)
+      , $fill := if ($isPlayer) then "red" else "yellow"
+      , $width := if ($isHorizontal) then $length else 1
+      , $height := if ($isHorizontal) then 1 else $length
+    return
+      <rect xmlns="http://www.w3.org/2000/svg" id="{generate-id($block)}" stroke="black" stroke-width="0.02" x="{$column}" y="{$row}" fill="{$fill}" width="{$width}" height="{$height}"/>
+};
+
+declare %updating function unblock:update-svg() {
+    let $level := $leveldoc/unblock:level
+		, $svg := b:dom()/svg:svg
+		, $g := $svg/svg:g[@id = 'board']
+    return
+    (
+        replace node $svg/svg:title/text() with concat("Unblock me level ", $levelnr),
+        insert node unblock:get-body() as last into $g,
+        insert node attribute prevX { "" } into $level,
+        insert node attribute prevY { "" } into $level,
+        insert node attribute mouseDown { "false" } into $level
+    )
+};
+
+declare %updating function unblock:mousedown() {
+    let
+        $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+      , $x := xs:double($coords/@x)
+      , $y := xs:double($coords/@y)
+      , $target := b:get($event, 'target')
+      , $level := $leveldoc/unblock:level
+      , $block := $level/unblock:block[generate-id() = $target/@id]
+    return (
+        replace value of node $level/@mouseDown with "true",
+        replace value of node $level/@prevX with $x,
+        replace value of node $level/@prevY with $y        
+    )
+};
+
+declare function unblock:rows($blocks) {
+    for $block in $blocks return xs:integer(data($block/@row))
+};
+
+declare function unblock:rows-plus-length($blocks) {
+    for $block in $blocks return xs:integer(data($block/@row)) + xs:integer(data($block/@length))
+};
+
+declare function unblock:rows-plus-one($blocks) {
+    for $block in $blocks return xs:integer(data($block/@row)) + 1
+};
+
+declare function unblock:max-y($block) {
+  let
+    $blocks := $leveldoc/unblock:level/unblock:block
+    , $below := $blocks[@row ge $block/@row + $block/@length]
+  return min((unblock:rows($below[@isHorizontal=true()][@column le $block/@column][@column + @length gt $block/@column]), unblock:rows($below[@isHorizontal=false()][@column eq $block/@column]), 6))
+};
+
+declare function unblock:min-y($block) {
+  let
+    $blocks := $leveldoc/unblock:level/unblock:block
+    , $above := $blocks[@row lt $block/@row]
+  return max((unblock:rows-plus-one($above[@isHorizontal=true()][@column le $block/@column][@column + @length gt $block/@column]), unblock:rows-plus-length($above[@isHorizontal=false()][@column eq $block/@column]), 0))
+};
+
+declare function unblock:columns($blocks) {
+    for $block in $blocks return xs:integer(data($block/@column))
+};
+
+declare function unblock:columns-plus-length($blocks) {
+    for $block in $blocks return xs:integer(data($block/@column)) + xs:integer(data($block/@length))
+};
+
+declare function unblock:columns-plus-one($blocks) {
+    for $block in $blocks return xs:integer(data($block/@column)) + 1
+};
+
+declare function unblock:max-x($block) {
+  let
+    $blocks := $leveldoc/unblock:level/unblock:block
+    , $right := $blocks[@column ge $block/@column + $block/@length]
+  return min((unblock:columns($right[@isHorizontal=false()][@row le $block/@row][@row + @length gt $block/@row]), unblock:columns($right[@isHorizontal=true()][@row eq $block/@row]), 6))
+};
+
+declare function unblock:min-x($block) {
+  let
+    $blocks := $leveldoc/unblock:level/unblock:block
+    , $left := $blocks[@column lt $block/@column]
+  return max((unblock:columns-plus-one($left[@isHorizontal=false()][@row le $block/@row][@row + @length gt $block/@row]), unblock:columns-plus-length($left[@isHorizontal=true()][@row eq $block/@row]), 0))
+};
+
+declare %updating function unblock:mousemove() {
+    let $level := $leveldoc/unblock:level
+    return if (xs:boolean($level/@mouseDown)) then
+        let
+          $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+        , $x := xs:double($coords/@x)
+        , $y := xs:double($coords/@y)
+        , $target := b:get($event, 'target')
+        , $block := $level/unblock:block[generate-id() = $target/@id]
+        , $isHorizontal := xs:boolean($block/@isHorizontal)
+        , $length := $block/@length
+        , $mouse-x := $level/@prevX
+        , $mouse-y := $level/@prevY
+
+        return (
+          replace value of node $level/@prevX with $x,
+          replace value of node $level/@prevY with $y,
+          if ($isHorizontal) then
+            let
+              $tx := xs:double($target/@x)
+              , $dx := min((max(($x - $mouse-x, unblock:min-x($block) - $tx)), unblock:max-x($block) - $tx - $length))
+            return replace value of node $target/@x with $tx + $dx
+          else
+            let
+              $ty := xs:double($target/@y)
+              , $dy := min((max(($y - $mouse-y, unblock:min-y($block) - $ty)), unblock:max-y($block) - $ty - $length))
+            return replace value of node $target/@y with $ty + $dy
+        )
+    else
+        ()
+};
+
+declare %updating function unblock:mouseup() {
+    let   $target := b:get($event, 'target')
+        , $new-x := round(xs:double($target/@x))
+        , $new-y := round(xs:double($target/@y))
+        , $level := $leveldoc/unblock:level
+        , $block := $level/unblock:block[generate-id() = $target/@id]
+        return (
+            replace value of node $target/@x with $new-x,
+            replace value of node $block/@column with $new-x,
+            replace value of node $target/@y with $new-y,
+            replace value of node $block/@row with $new-y,
+            replace value of node $level/@mouseDown with "false"
+        )
+
+};
+declare function unblock:goto-level($new-level) {
+    b:navigate-to(concat("?level=", $new-level))
+};
+
+declare function unblock:reload() {
+    unblock:goto-level($levelnr)
+};
+
+declare function unblock:prev-level() {
+    if ($levelnr > 1) then unblock:goto-level($levelnr - 1) else ()
+};
+
+declare function unblock:next-level() {
+    if ($levelnr < 100) then unblock:goto-level($levelnr + 1) else ()
+};
+
+declare %updating function unblock:add-listeners() {
+    let $svg := b:dom()/svg:svg
+        , $board := $svg/svg:g[@id = 'board']
+        , $btn-reload := $svg/svg:g/svg:g[@id = 'btn-reload']
+        , $btn-prev := $svg/svg:g/svg:g[@id = 'btn-prev']
+        , $btn-next := $svg/svg:g/svg:g[@id = 'btn-next']
+    return (
+        b:addEventListener($board, "pointerdown", "unblock:mousedown()"),
+        b:addEventListener($board, "pointermove", "unblock:mousemove()"),
+        b:addEventListener($board, "pointerup", "unblock:mouseup()"),
+        b:addEventListener($board, "mouseout", "unblock:mouseup()"),
+        b:addEventListener($btn-reload, "pointerdown", "unblock:reload()"),
+        b:addEventListener($btn-prev, "pointerdown", "unblock:prev-level()"),
+        b:addEventListener($btn-next, "pointerdown", "unblock:next-level()")
+    )
+};
+
+]]>
+  </script>
+  <script id="xquery-main" type="application/xquery" after-update="add-listeners">
+<![CDATA[
+    unblock:update-svg()
+]]>
+	</script>
+    <script id="add-listeners" type="application/xquery">
+<![CDATA[
+    unblock:add-listeners()
+]]>
+    </script>
+
+	<rect stroke="brown" stroke-width="0.02"  x="-0.05" y="-0.05" width="6.1" height="6.1" fill="white"/>
+    <g id="board">        
+    </g>
+
+    <!-- Button row  -->
+    <g id="controls" font-family="sans-serif" font-size="0.35"
+       text-anchor="middle" pointer-events="all">
+
+        <!-- Previous -->
+        <g id="btn-prev" class="button" cursor="pointer">
+            <rect x="0.2" y="6.2" width="1.6" height="0.8"
+                  rx="0.15" ry="0.15"
+                  fill="#ddd" stroke="#444" stroke-width="0.02"  />
+            <text x="1.0" y="6.72">Prev</text>
+        </g>
+
+        <!-- Reload -->
+        <g id="btn-reload" class="button" cursor="pointer">
+            <rect x="2.3" y="6.2" width="1.6" height="0.8"
+                  rx="0.15" ry="0.15"
+                  fill="#ddd" stroke="#444" stroke-width="0.02"  />
+            <text x="3.1" y="6.72">Reload</text>
+        </g>
+
+        <!-- Next -->
+        <g id="btn-next" class="button" cursor="pointer">
+            <rect x="4.4" y="6.2" width="1.6" height="0.8"
+                  rx="0.15" ry="0.15"
+                  fill="#ddd" stroke="#444" stroke-width="0.02"  />
+            <text x="5.2" y="6.72">Next</text>
+        </g>
+    </g>
+</svg>

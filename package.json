@@ -4,10 +4,10 @@
 	"type": "module",
 	"main": "build.js",
 	"scripts": {
-		"start": "vite"
+		"start": "vite --host"
 	},
 	"dependencies": {
-		"fontoxpath": "^3.33.1",
+		"fontoxpath": "../fontoxpath/",
 		"xml-js": "^1.6.11"
 	},
 	"devDependencies": {

@@ -5,7 +5,7 @@
 	viewBox="0 0 32 32"
 >
 	<title>Chainreaction</title>
-	<script type="module" xlink:href="chainreaction.js"></script>
+	<script type="module" xlink:href="xqib.js"></script>
 	<script id="xquery-module" type="application/xquery">
 <![CDATA[
 module namespace chain="http://mansoft.nl/chain";
@@ -14,10 +14,9 @@ declare namespace svg="http://www.w3.org/2000/svg";
 declare namespace xlink="http://www.w3.org/1999/xlink";
 declare namespace b="http://mansoft.nl/xqib";
 
-declare variable $leveldoc external;
-declare variable $levelnr external;
+declare variable $levelnr := chain:get-level();
+declare variable $leveldoc := b:doc(concat("chain-level", $levelnr, ".xml"));
 declare variable $event external;
-declare variable $target external;
 
 declare function chain:process-field($row, $column, $field ) {
   let $x := ($column - 1) * 10 + 1
@@ -26,41 +25,47 @@ declare function chain:process-field($row, $column, $field ) {
     if (empty($field)) then
       <use xmlns="http://www.w3.org/2000/svg" xlink:href="#empty" x="{$x}" y="{$y}"/>
     else
-      <use xmlns="http://www.w3.org/2000/svg" xlink:href="{concat('#', $field/@shape)}" x="{$x}" y="{$y}" fill="{$field/@color}" color="{if ($field/@state = 'current') then 'black' else if ($field/@state = 'visited') then 'white' else $field/@color}" chain:row="{$row}" chain:column="{$column}"/>
+      <use xmlns="http://www.w3.org/2000/svg" xlink:href="{concat('#', $field/@shape)}" x="{$x}" y="{$y}" fill="{$field/@color}" color="{if ($field/@state = 'current') then 'black' else if ($field/@state = 'visited') then 'white' else $field/@color}" chain:id="{generate-id($field)}"/>
 };
 
-declare %updating function chain:load-svg() {
+declare function chain:get-body($chainreaction) {
+    let $chain-field := $chainreaction/chain:field
+        , $columns := xs:integer($chainreaction/@columns)
+        , $rows := xs:integer($chainreaction/@rows)
+    return
+        for $row in 1 to $rows, $column in 1 to $columns
+            let
+                $field := $chain-field[xs:integer(@row) = $row][xs:integer(@column) = $column]
+                , $use := chain:process-field($row, $column, $field)
+            return $use
+};
+
+declare %updating function chain:update-svg() {
     let $chainreaction := $leveldoc/chain:chain-game
-        , $chain-field := $chainreaction/chain:field
         , $columns := xs:integer($chainreaction/@columns)
         , $rows := xs:integer($chainreaction/@rows)
 		, $svg := b:dom()/svg:svg
     return
     (
         replace value of node $svg/@viewBox with concat("0 0 ", $columns * 10 + 2, " ", $rows * 10 + 2),
-        replace node b:dom()/svg:svg/svg:title/text() with concat("Chainreaction level ", $levelnr),
-        (
-        for $row in 1 to $rows, $column in 1 to $columns
-            let
-                $field := $chain-field[xs:integer(@row) = $row][xs:integer(@column) = $column]
-                , $use := chain:process-field($row, $column, $field)
-            return insert node $use as last into $svg
-        )
+        replace node $svg/svg:title/text() with concat("Chainreaction level ", $levelnr),
+        insert node chain:get-body($chainreaction) as last into $svg
     )
 };
 
-declare %updating function chain:click-svg($use) {
-    if (not(empty($use/@chain:row)) and not(empty($use/@chain:column))) then
+declare %updating function chain:click-svg() {
+    let $use := b:get($event, 'target')
+    return if (not(empty($use/@chain:id))) then
     (
         let $field := $leveldoc/chain:chain-game/chain:field
             , $unvisited := $field[@state = 'unvisited']
-            , $new-field := $field[@row = $use/@chain:row][@column = $use/@chain:column]
+            , $new-field := $field[generate-id() = $use/@chain:id]
             , $current-field := $field[@state = 'current']
             , $current-row := data($current-field/@row)
             , $current-col := data($current-field/@column)
             , $new-row := data($new-field/@row)
             , $new-col := data($new-field/@column)
-            , $current-svg-color := $use/../svg:use[@chain:row = $current-row][@chain:column = $current-col]/@color
+            , $current-svg-color := $use/../svg:use[@chain:id = generate-id($current-field)]/@color
             , $new-svg-color := $use/@color
         return
         (
@@ -86,12 +91,41 @@ declare %updating function chain:click-svg($use) {
         ()
 };
 
+declare %updating function chain:keydown-svg() {
+  let $key := trace(b:get($event, 'key'))
+  return
+    if ($key = 'n') then (if ($levelnr < 6) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
+    if ($key = 'p') then (if ($levelnr > 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
+    (
+    )
+};
+
 declare %updating function chain:add-listeners() {
-	b:addEventListener(b:dom()//svg:svg, "click", "chain:click-svg($target)")
+	b:addEventListener(b:dom()//svg:svg, "click", "chain:click-svg()"),
+	b:addEventListener(b:dom()//svg:svg, "keydown", "chain:keydown-svg()")
 };
 	
+declare function chain:get-level() as xs:integer {
+    let $search := b:location("search")
+    return
+        if (starts-with($search, '?level=')) then
+            xs:integer(substring($search, 8))
+        else
+            1
+};
+
 ]]>
 	</script>
+    <script id="xquery-main" type="application/xquery" after-update="add-listeners">
+<![CDATA[
+    chain:update-svg()
+]]>
+    </script>
+    <script id="add-listeners" type="application/xquery">
+<![CDATA[
+    chain:add-listeners()
+]]>
+    </script>
 	<defs>
 		<rect id="empty" width="10" height="10" stroke="lightgrey" fill="white" stroke-width="0.2"/>
 		<g id="circle" stroke-width="0.5">

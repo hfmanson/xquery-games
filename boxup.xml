@@ -1,15 +1,13 @@
 <svg
-	xmlns="http://www.w3.org/2000/svg"
-	xmlns:xlink="http://www.w3.org/1999/xlink"
-	xmlns:boxup="http://mansoft.nl/boxup"
-	width="100%" height="100%"
-	viewBox="-0.1 -0.1 1.2 1.2"
-	boxup:rows="1"
-	boxup:columns="1"
+  xmlns="http://www.w3.org/2000/svg"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:boxup="http://mansoft.nl/boxup"
+  width="100%" height="100%"
+  viewBox="-0.1 -0.1 1.2 1.2"
 >
-	<title>Box Up</title>
-	<script type="module" xlink:href="boxup.js"></script>
-	<script id="xquery-module" type="application/xquery">
+  <title>Box Up</title>
+  <script type="module" xlink:href="xqib.js"></script>
+  <script id="xquery-module" type="application/xquery">
 <![CDATA[
 module namespace boxup="http://mansoft.nl/boxup";
 
@@ -18,16 +16,39 @@ declare namespace xlink="http://www.w3.org/1999/xlink";
 declare namespace svg="http://www.w3.org/2000/svg";
 declare namespace b="http://mansoft.nl/xqib";
 
-declare variable $leveldoc external;
-declare variable $levelnr external;
+declare variable $levelnr := boxup:get-level();
+declare variable $leveldoc := b:doc(concat("level", $levelnr, ".xml"));
 declare variable $event external;
+declare variable $box-sizes :=
+    <box-sizes xmlns="http://mansoft.nl/boxup-vars">
+        <box-size depth="1" use="#big-box"/>
+        <box-size depth="2" use="#small-box"/>
+    </box-sizes>
+;
+
+declare variable $box-colors := 
+    <box-colors xmlns="http://mansoft.nl/boxup-vars">
+        <box-color box-type="normal" color="black"/>
+        <box-color box-type="source" color="red"/>
+        <box-color box-type="destination" color="blue"/>
+    </box-colors>
+;
+
+declare variable $rotations := 
+    <rotations xmlns="http://mansoft.nl/boxup-vars">
+        <rotation dx="0" dy="1" rotation="0"/>
+        <rotation dx="0" dy="-1" rotation="180"/>
+        <rotation dx="1" dy="0" rotation="-90"/>
+        <rotation dx="-1" dy="0" rotation="90"/>
+    </rotations>
+;
 
 declare function boxup:transform($column, $row, $rotation) {
     concat('translate(', $column - 1, ', ', $row - 1, ') rotate(', $rotation, ', 0.5, 0.5)')
 };
 
 declare function boxup:process-mover($mover) {
-	<use xmlns="http://www.w3.org/2000/svg" id="use-mover" xlink:href="#mover" transform="{boxup:transform($mover/@column, $mover/@row, 0)}"/>
+  <use xmlns="http://www.w3.org/2000/svg" id="use-mover" xlink:href="#mover" transform="{boxup:transform($mover/@column, $mover/@row, 0)}"/>
 };
 
 declare function boxup:process-blocks($blocks)  {
@@ -43,53 +64,43 @@ declare function boxup:process-boxes($boxes)  {
     let $column := $box/@column
         , $row := $box/@row
         , $depth := $box/@depth
-	    , $box-sizes :=
-    <box-sizes xmlns="http://mansoft.nl/boxup-vars">
-        <box-size depth="1" use="#big-box"/>
-        <box-size depth="2" use="#small-box"/>
-    </box-sizes>
-        , $box-use := $box-sizes/boxup-vars:box-size[@depth eq $box/@depth]/@use
-	    , $box-colors := 
-    <box-colors xmlns="http://mansoft.nl/boxup-vars">
-        <box-color box-type="normal" color="black"/>
-        <box-color box-type="source" color="red"/>
-        <box-color box-type="destination" color="blue"/>
-    </box-colors>
-        , $box-color := $box-colors/boxup-vars:box-color[@*:box-type eq $box/@*:box-type]/@color
         , $dx := $box/@dx
         , $dy := $box/@dy
-	    , $rotations := 
-    <rotations xmlns="http://mansoft.nl/boxup-vars">
-        <rotation dx="0" dy="1" rotation="0"/>
-        <rotation dx="0" dy="-1" rotation="180"/>
-        <rotation dx="1" dy="0" rotation="-90"/>
-        <rotation dx="-1" dy="0" rotation="90"/>
-    </rotations>
+        , $box-color := $box-colors/boxup-vars:box-color[@*:box-type eq $box/@*:box-type]/@color
+        , $box-use := $box-sizes/boxup-vars:box-size[@depth eq $box/@depth]/@use
         , $rotation := $rotations/boxup-vars:rotation[@dx eq $dx][@dy eq $dy]/@rotation
         , $transform := boxup:transform($column, $row, $rotation)
     return
-        <use xmlns="http://www.w3.org/2000/svg" boxup:row="{$row}" boxup:column="{$column}" boxup:depth="{$depth}" xlink:href="{$box-use}" transform="{$transform}" stroke="{$box-color}">
+        <use xmlns="http://www.w3.org/2000/svg" boxup:id="{generate-id($box)}" xlink:href="{$box-use}" transform="{$transform}" stroke="{$box-color}">
         </use>
 };
 
-declare %updating function boxup:load-svg() {
+declare function boxup:get-body($boxup-game) {
+    let
+        $columns := xs:integer($boxup-game/@columns)
+        , $rows := xs:integer($boxup-game/@rows)
+    return
+  (
+    for $y in 0 to $rows - 1, $x in 0 to $columns - 1
+      return
+        <use xmlns="http://www.w3.org/2000/svg" xlink:href="#empty" x="{$x}" y="{$y}"/>,
+    boxup:process-boxes($boxup-game/boxup:box),
+    boxup:process-mover($boxup-game/boxup:mover),
+    boxup:process-blocks($boxup-game/boxup:block)
+  )
+};
+
+declare %updating function boxup:update-svg() {
     let $boxup-game := $leveldoc/boxup:boxup
         , $columns := xs:integer($boxup-game/@columns)
         , $rows := xs:integer($boxup-game/@rows)
-		, $svg := b:dom()/svg:svg
+    , $svg := b:dom()/svg:svg
     return
-	(
-		replace value of node $svg/@viewBox with concat("-0.1 -0.1 ", $columns + 0.2, " ", $rows + 0.2),
-		replace node b:dom()/svg:svg/svg:title/text() with concat("Box Up level ", $levelnr),
-		for $y in 0 to $rows - 1, $x in 0 to $columns - 1
-			return (
-				insert node <use xmlns="http://www.w3.org/2000/svg" xlink:href="#empty" x="{$x}" y="{$y}"/> as last into $svg),
-		for $box in boxup:process-boxes($boxup-game/boxup:box)
-		return
-			insert node $box as last into $svg,
-		insert node boxup:process-mover($boxup-game/boxup:mover) as last into $svg,
-		insert node boxup:process-blocks($boxup-game/boxup:block) as last into $svg
-	)
+  (
+    replace value of node $svg/@viewBox with concat("-0.1 -0.1 ", $columns + 0.2, " ", $rows + 0.2),
+    replace node $svg/svg:title/text() with concat("Box Up level ", $levelnr),
+    insert node boxup:get-body($boxup-game) as last into $svg
+  )
 };
 
 declare %updating function boxup:move-mover($model-mover, $svg-mover, $x, $y) {
@@ -119,9 +130,7 @@ declare function boxup:check-win($box, $dest-box, $new-column, $new-row) {
 declare %updating function boxup:move-box($box, $svg-box, $new-column, $new-row) {
   replace value of node $box/@column with $new-column,
   replace value of node $box/@row with $new-row,  
-  replace value of node $svg-box/@transform with boxup:transform($new-column, $new-row, boxup:get-rotation($box)),
-  replace value of node $svg-box/@boxup:column with $new-column,
-  replace value of node $svg-box/@boxup:row with $new-row
+  replace value of node $svg-box/@transform with boxup:transform($new-column, $new-row, boxup:get-rotation($box))
 };
 
 
@@ -133,7 +142,7 @@ declare %updating function boxup:update($model-mover, $svg-mover, $x, $y, $new-x
     boxup:move-mover($model-mover, $svg-mover, $new-x, $new-y),
     for $box in $mover-boxes
     let $box-depth1 := $mover-boxes[xs:integer(@depth) = 1]
-        , $svg-box := $svg-mover/../svg:use[xs:integer(@boxup:column) eq xs:integer($box/@column)][xs:integer(@boxup:row) eq xs:integer($box/@row)][xs:integer(@boxup:depth) eq xs:integer($box/@depth)]
+        , $svg-box := $svg-mover/../svg:use[@boxup:id eq generate-id($box)]
     return
       if (xs:integer($box/@dx) ne -$dx or xs:integer($box/@dy) ne -$dy or xs:integer($box/@depth) eq 2 and not(empty($box-depth1)) and (xs:integer($box-depth1/@dx) ne -$dx or xs:integer($box-depth1/@dy) ne -$dy)) then
         (
@@ -156,11 +165,11 @@ declare function boxup:max-depth($boxes, $column, $row) {
 
 declare %updating function boxup:check-move($dx, $dy)  {
   let $model-element := $leveldoc/boxup:boxup
-	  , $model-mover := $model-element/boxup:mover
+    , $model-mover := $model-element/boxup:mover
       , $svg-mover := b:dom()/svg:svg/svg:use[@xlink:href='#mover']
       , $boxes := $model-element/boxup:box
       , $blocks := $model-element/boxup:block
-	  , $column := xs:integer($model-mover/@column)
+    , $column := xs:integer($model-mover/@column)
       , $row := xs:integer($model-mover/@row)
       , $new-column := $column + $dx
       , $new-row := $row + $dy
@@ -188,28 +197,49 @@ return
   )
 };
 
+declare function boxup:get-level() as xs:integer {
+    let $search := b:location("search")
+    return
+        if (starts-with($search, '?level=')) then
+            xs:integer(substring($search, 8))
+        else
+            1
+};
+
 declare %updating function boxup:keydown-svg() {
-  let $key := trace($event/@key, 'key')
+  let $key := trace(b:get($event, 'key'))
 
   return
     if ($key = 'ArrowLeft') then boxup:check-move(-1, 0) else
     if ($key = 'ArrowRight') then boxup:check-move(1, 0) else
     if ($key = 'ArrowUp') then boxup:check-move(0, -1) else
     if ($key = 'ArrowDown') then boxup:check-move(0, 1) else
+    if ($key = 'n') then (if ($levelnr < 6) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
+    if ($key = 'p') then (if ($levelnr > 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
     ()
 };
 
 declare %updating function boxup:add-listeners() {
-	b:addEventListener(b:dom()//svg:svg, "keydown", "boxup:keydown-svg()")
+  b:addEventListener(b:dom()//svg:svg, "keydown", "boxup:keydown-svg()")
 };
 
 ]]>
-	</script>
-	<defs>
-		<rect id="empty" stroke="grey" stroke-width="0.02" fill="white" height="1" width="1"/>
-		<rect id="mover" x="0.375" y="0.375" height="0.25" width="0.25"/>
-		<path id="big-box" fill="none" stroke-width="0.075" d="M 0.1 0.1 l 0 0.8 l 0.8 0 l 0 -0.8"/>
-		<path id="small-box" fill="none" stroke-width="0.075" d="M 0.225 0.225 l 0 0.55 l 0.55 0 l 0 -0.55"/>
-		<rect id="block" stroke="grey" stroke-width="0.02" fill="black" height="1" width="1"/>
-	</defs>
+  </script>
+  <script id="xquery-main" type="application/xquery" after-update="add-listeners">
+<![CDATA[
+  boxup:update-svg()
+]]>
+    </script>
+    <script id="add-listeners" type="application/xquery">
+<![CDATA[
+  boxup:add-listeners()
+]]>
+    </script>
+  <defs>
+    <rect id="empty" stroke="grey" stroke-width="0.02" fill="white" height="1" width="1"/>
+    <rect id="mover" x="0.375" y="0.375" height="0.25" width="0.25"/>
+    <path id="big-box" fill="none" stroke-width="0.075" d="M 0.1 0.1 l 0 0.8 l 0.8 0 l 0 -0.8"/>
+    <path id="small-box" fill="none" stroke-width="0.075" d="M 0.225 0.225 l 0 0.55 l 0.55 0 l 0 -0.55"/>
+    <rect id="block" stroke="grey" stroke-width="0.02" fill="black" height="1" width="1"/>
+  </defs>
 </svg>
