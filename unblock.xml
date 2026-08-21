@@ -47,22 +47,7 @@ declare %updating function unblock:update-svg() {
         insert node unblock:get-body() as last into $g,
         insert node attribute prevX { "" } into $level,
         insert node attribute prevY { "" } into $level,
-        insert node attribute mouseDown { "false" } into $level
-    )
-};
-
-declare %updating function unblock:mousedown() {
-    let
-        $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
-      , $x := xs:double($coords/@x)
-      , $y := xs:double($coords/@y)
-      , $target := b:get($event, 'target')
-      , $level := $leveldoc/unblock:level
-      , $block := $level/unblock:block[generate-id() = $target/@id]
-    return (
-        replace value of node $level/@mouseDown with "true",
-        replace value of node $level/@prevX with $x,
-        replace value of node $level/@prevY with $y        
+        insert node attribute pointerDown { "false" } into $level
     )
 };
 
@@ -118,9 +103,24 @@ declare function unblock:min-x($block) {
   return max((unblock:columns-plus-one($left[@isHorizontal=false()][@row le $block/@row][@row + @length gt $block/@row]), unblock:columns-plus-length($left[@isHorizontal=true()][@row eq $block/@row]), 0))
 };
 
-declare %updating function unblock:mousemove() {
+declare %updating function unblock:pointerdown() {
+    let
+        $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+      , $x := xs:double($coords/@x)
+      , $y := xs:double($coords/@y)
+      , $target := b:get($event, 'target')
+      , $level := $leveldoc/unblock:level
+      , $block := $level/unblock:block[generate-id() = $target/@id]
+    return (
+        replace value of node $level/@pointerDown with "true",
+        replace value of node $level/@prevX with $x,
+        replace value of node $level/@prevY with $y        
+    )
+};
+
+declare %updating function unblock:pointermove() {
     let $level := $leveldoc/unblock:level
-    return if (xs:boolean($level/@mouseDown)) then
+    return if (xs:boolean($level/@pointerDown)) then
         let
           $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
         , $x := xs:double($coords/@x)
@@ -150,7 +150,7 @@ declare %updating function unblock:mousemove() {
         ()
 };
 
-declare %updating function unblock:mouseup() {
+declare %updating function unblock:pointerup() {
     let   $target := b:get($event, 'target')
         , $new-x := round(xs:double($target/@x))
         , $new-y := round(xs:double($target/@y))
@@ -161,7 +161,7 @@ declare %updating function unblock:mouseup() {
             replace value of node $block/@column with $new-x,
             replace value of node $target/@y with $new-y,
             replace value of node $block/@row with $new-y,
-            replace value of node $level/@mouseDown with "false"
+            replace value of node $level/@pointerDown with "false"
         )
 
 };
@@ -188,10 +188,10 @@ declare %updating function unblock:add-listeners() {
         , $btn-prev := $svg/svg:g/svg:g[@id = 'btn-prev']
         , $btn-next := $svg/svg:g/svg:g[@id = 'btn-next']
     return (
-        b:addEventListener($board, "pointerdown", "unblock:mousedown()"),
-        b:addEventListener($board, "pointermove", "unblock:mousemove()"),
-        b:addEventListener($board, "pointerup", "unblock:mouseup()"),
-        b:addEventListener($board, "mouseout", "unblock:mouseup()"),
+        b:addEventListener($board, "pointerdown", "unblock:pointerdown()"),
+        b:addEventListener($board, "pointermove", "unblock:pointermove()"),
+        b:addEventListener($board, "pointerup", "unblock:pointerup()"),
+        b:addEventListener($board, "mouseout", "unblock:pointerup()"),
         b:addEventListener($btn-reload, "pointerdown", "unblock:reload()"),
         b:addEventListener($btn-prev, "pointerdown", "unblock:prev-level()"),
         b:addEventListener($btn-next, "pointerdown", "unblock:next-level()")
