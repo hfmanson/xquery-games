@@ -11,11 +11,11 @@
     viewBox="0 0 12 12"
 >
     <title>Tilemathics</title>
-    <xhtml:audio id="move" src="move.wav"/>
-    <xhtml:audio id="lock" src="lock.wav"/>
-    <xhtml:audio id="wrong" src="wrong.wav"/>
-    <xhtml:audio id="tick" src="tick.wav"/>
-    <xhtml:audio id="winner" src="winner.wav"/>
+    <xhtml:audio id="move" src="move.wav" loading="lazy"/>
+    <xhtml:audio id="lock" src="lock.wav" loading="lazy"/>
+    <xhtml:audio id="wrong" src="wrong.wav" loading="lazy"/>
+    <xhtml:audio id="tick" src="tick.wav" loading="lazy"/>
+    <xhtml:audio id="winner" src="winner.wav" loading="lazy"/>
 	<script type="module" xlink:href="xqib.js" async="async"/>
 	<script id="xquery-module" type="application/xquery">
 <![CDATA[
@@ -155,7 +155,7 @@ declare function tm:copy-model($level) {
     , $levelHeight := xs:integer($level/levelHeight/text())
   return
   copy $model :=
-    <tm:level width="{$levelWidth}" height="{$levelHeight}">
+    <tm:level width="{$levelWidth}" height="{$levelHeight}" pointerDown="false" downX="0" downY="0">
     {
      for $layer as xs:string at $position in $level/Layers/Layer
      let
@@ -402,7 +402,7 @@ declare %updating function tm:move($mover as element(), $dx as xs:integer, $dy a
         )
 };
 
-declare %updating function tm:keydown-svg() {
+declare %updating function tm:keydown() {
   let $key := trace(b:get($event, 'key'))
       , $mover := $leveldoc/tm:level/tm:field[@type = 'mover'][@selected = 'true']
   return
@@ -410,8 +410,8 @@ declare %updating function tm:keydown-svg() {
     if ($key = 'ArrowRight') then tm:move($mover, 1, 0) else
     if ($key = 'ArrowUp') then tm:move($mover, 0, -1) else
     if ($key = 'ArrowDown') then tm:move($mover, 0, 1) else
-    if ($key = 'n') then (if ($levelnr < 59) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
-    if ($key = 'p') then (if ($levelnr > 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
+    if ($key = 'n') then (if ($levelnr lt 59) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
+    if ($key = 'p') then (if ($levelnr gt 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
     (
         let
             $next-mover := $mover/following-sibling::tm:field[@type = 'mover'][1]
@@ -420,56 +420,66 @@ declare %updating function tm:keydown-svg() {
     )
 };
 
-declare %updating function tm:pointerdown-svg() {
+declare %updating function tm:pointerdown() {
 	let
         $g := b:get($event, 'currentTarget')
+        , $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+        , $x := xs:double($coords/@x)
+        , $y := xs:double($coords/@y)
         , $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
 		, $current-mover := $movers[@selected = true()]
+        , $hfm := trace($leveldoc/tm:level/@pointerDown, "pointerDown")
 		, $id := $g/@id
 		, $new-mover := $movers[@id = $id]
-	return if (empty($new-mover)) then () else tm:select-mover($current-mover, $new-mover)
+	return
+    (
+        if (empty($new-mover)) then () else (
+            replace value of node $leveldoc/tm:level/@pointerDown with "true",
+            replace value of node $leveldoc/tm:level/@downX with $x,
+            replace value of node $leveldoc/tm:level/@downY with $y,
+            tm:select-mover($current-mover, $new-mover)
+        )
+    )
 };
 
-declare %updating function tm:pointerenter-svg() {
-	let $buttons := trace(b:get($event, 'buttons'))
-        , $g := trace(b:get($event, 'currentTarget'))
-	return if ($buttons != 0) then (	
-		let
-			$movers := $leveldoc/tm:level/tm:field[@type = 'mover']
-			, $current-mover := $movers[@selected = true()]
-			, $cm-x := $current-mover/@x
-			, $cm-y := $current-mover/@y
-			, $id := $g/@id
-			, $new-mover := $movers[@id = $id]
-			, $field := $leveldoc/tm:level/tm:field[@id = $id]
-			, $dx := $field/@x - $cm-x
-			, $dy := $field/@y - $cm-y
-			, $abs-dx := abs($dx)
-			, $abs-dy := abs($dy)
-			return if ($abs-dx = 0 and $abs-dy = 0 ) then
-				()
-			else if ($abs-dx > $abs-dy) then
-				tm:move($current-mover, if ($dx > 0) then 1 else -1, 0)
-			else
-				tm:move($current-mover, 0, if ($dy > 0) then 1 else -1)
-	) else
-		()
-};
-
-declare %updating function tm:pointercancel-svg($g) {
-	let $g := b:get($event, 'currentTarget')
-        , $dummy := $g/local-name()
-	return ()
+declare %updating function tm:pointerup() {
+	let 
+        $pointerDown := trace(xs:boolean($leveldoc/tm:level/@pointerDown), "pointerDown")
+        , $downX := trace($leveldoc/tm:level/@downX, "downX")
+        , $downY := trace($leveldoc/tm:level/@downY, "downY")
+		, $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
+        , $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+        , $x := xs:double($coords/@x)
+        , $y := xs:double($coords/@y)
+    	, $current-mover := $movers[@selected = true()]
+        , $dx := trace($x - $downX, "dx")
+        , $dy := trace($y - $downY, "dy")
+        , $abs-dx := abs($dx)
+        , $abs-dy := abs($dy)
+	return
+    (
+        if ($pointerDown) then
+        (
+            replace value of node $leveldoc/tm:level/@pointerDown with "false",
+            if ($abs-dx lt 5 and $abs-dy lt 5) then
+                ()
+            else if ($abs-dx gt $abs-dy) then
+                tm:move($current-mover, if ($dx gt 0) then 1 else -1, 0)
+            else
+                tm:move($current-mover, 0, if ($dy gt 0) then 1 else -1)
+        )
+        else
+        ()
+    )
 };
 
 declare %updating function tm:add-listeners() {
-	b:addEventListener(b:dom()//svg:svg, "keydown", "tm:keydown-svg()"),
+	b:addEventListener(b:dom()//svg:svg, "keydown", "tm:keydown()"),
 	for $g as element() in b:dom()//svg:g
 	return
 	(
-		b:addEventListener($g, "pointerdown", "tm:pointerdown-svg()"),
-		b:addEventListener($g, "pointercancel", "tm:pointercancel-svg()"),
-		b:addEventListener($g, "pointerenter", "tm:pointerenter-svg()")
+		b:addEventListener($g, "pointerdown", "tm:pointerdown()"),
+		b:addEventListener($g, "pointerup", "tm:pointerup()")
 	)
 };
 
