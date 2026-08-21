@@ -16,7 +16,7 @@
     <xhtml:audio id="wrong" src="wrong.wav"/>
     <xhtml:audio id="tick" src="tick.wav"/>
     <xhtml:audio id="winner" src="winner.wav"/>
-	<script type="module" xlink:href="xqib.js"/>
+	<script type="module" xlink:href="xqib.js" async="async"/>
 	<script id="xquery-module" type="application/xquery">
 <![CDATA[
 module namespace tm="http://mansoft.nl/tilemathics";

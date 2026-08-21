@@ -6,7 +6,7 @@
   viewBox="-0.1 -0.1 1.2 1.2"
 >
   <title>Box Up</title>
-  <script type="module" xlink:href="xqib.js"></script>
+	<script type="module" xlink:href="xqib.js" async="async"/>
   <script id="xquery-module" type="application/xquery">
 <![CDATA[
 module namespace boxup="http://mansoft.nl/boxup";

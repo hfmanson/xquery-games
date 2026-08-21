@@ -5,7 +5,7 @@
 	viewBox="0 0 32 32"
 >
 	<title>Chainreaction</title>
-	<script type="module" xlink:href="xqib.js"></script>
+	<script type="module" xlink:href="xqib.js" async="async"/>
 	<script id="xquery-module" type="application/xquery">
 <![CDATA[
 module namespace chain="http://mansoft.nl/chain";
