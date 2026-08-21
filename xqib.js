@@ -4,7 +4,9 @@ import * as fontoxpath from 'fontoxpath';
 
 // async script, executed after DOMContentLoaded
 const
-	xqm = document.getElementById('xquery-module').textContent
+	ctx = new AudioContext()
+	, sounds = {}
+	, xqm = document.getElementById('xquery-module').textContent
 	, moduleImports = fontoxpath.registerXQueryModule(xqm)
 	, ns_xqib = 'http://mansoft.nl/xqib'
 	, URI_BY_PREFIX = {
@@ -44,7 +46,15 @@ fontoxpath.registerCustomXPathFunction(
 	}
 	, ['xs:string']
 	, 'xs:string'
-	, async (_, sound) => { document.getElementById(sound).cloneNode().play(); return "" }
+	, async (_, sound) => {
+		const buffer = sounds[sound];
+		if (!buffer) return;
+		const src = ctx.createBufferSource();
+		src.buffer = buffer;
+		src.connect(ctx.destination);
+		src.start();
+		return ""
+	}
 );
 // Register a function called 'dom' in the 'b' namespace:
 fontoxpath.registerCustomXPathFunction(
@@ -225,6 +235,22 @@ fontoxpath.registerCustomXPathFunction(
 
 let
 	current_xq_id = "xquery-main";
+
+// Preload and decode all <xhtml:audio> elements
+document.querySelectorAll("audio").forEach(el => {
+  const id = el.id
+  const src = el.getAttribute("src");
+  if (!src || !id) return;
+
+  fetch(new URL(src, document.baseURI).href)
+    .then(r => r.arrayBuffer())
+    .then(b => ctx.decodeAudioData(b))
+    .then(buffer => {
+      sounds[id] = buffer;
+      console.log(`Loaded ${id}`);
+    })
+    .catch(err => console.error(`Error loading ${id}:`, err));
+});
 
 do {
 	const
