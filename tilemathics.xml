@@ -5,7 +5,7 @@
     xmlns:svg="http://www.w3.org/2000/svg"
     xmlns:xhtml="http://www.w3.org/1999/xhtml"
     xmlns:xlink="http://www.w3.org/1999/xlink"
-    xmlns:tm="http://mansoft.nl/tilemathics" 
+    xmlns:tm="http://mansoft.nl/tilemathics"
     width="100%"
     height="100%"
     viewBox="0 0 12 12"
@@ -120,7 +120,7 @@ declare function tm:process-field($x as xs:integer, $y as xs:integer, $layer as 
           else
             ()
     return
-        <tm:field layer="{$layer}" x="{$x}" y="{$y}">        
+        <tm:field layer="{$layer}" x="{$x}" y="{$y}">
           {
             attribute id { concat('l', $layer, '-x', $x, '-y', $y) },
             $tilemathics-attributes
@@ -132,7 +132,7 @@ declare function tm:process-tilemathics-field($field as element(), $selected as 
 <g xmlns="http://www.w3.org/2000/svg" transform="translate({($field/@x - 1) * 10 + 1}, {($field/@y - 1) * 10 + 1})">
 {
     attribute id {$field/@id},
-    <use xmlns="http://www.w3.org/2000/svg" xlink:href="#square" stroke='black' fill="{if ($field/@layer = 1) then 'green' else if ($selected = true()) then 'orange' else 'yellow'}"/>,    
+    <use xmlns="http://www.w3.org/2000/svg" xlink:href="#square" stroke='black' fill="{if ($field/@layer = 1) then 'green' else if ($selected = true()) then 'orange' else 'yellow'}"/>,
     if (not(empty($field/@symbol))) then
         tm:create-text($field/@symbol, $field/@color)
     else if (not(empty($field/@use-id))) then
@@ -187,13 +187,14 @@ declare %updating function tm:update-svg() {
   let
     $model := tm:copy-model($leveldoc/Level)
 	, $svg := b:dom()/svg:svg
+    , $g := $svg/svg:g[@id = 'board']
   return
   (
-    replace value of node $svg/@viewBox with concat("0 0 ", data($model/@width) * 10 + 2, " ", data($model/@height) * 10 + 2),
+    replace value of node $svg/@viewBox with concat("0 0 ", data($model/@width) * 10 + 2, " ", data($model/@height + 1) * 10 + 2),
     replace node $svg/svg:title/text() with concat("Tilemathics level ", $levelnr),
-    insert node tm:get-body($model) as last into $svg,
+    insert node tm:get-body($model) as last into $g,
     replace node $leveldoc/Level with $model
-  )  
+  )
 };
 
 
@@ -202,7 +203,7 @@ declare function tm:get-transform($x as xs:integer, $y as xs:integer) as xs:stri
 };
 
 declare function tm:get-svg-element($id as xs:string) as element() {
-    b:dom()/svg:svg/svg:g[@id = $id]
+    b:dom()//svg:g[@id = $id]
 };
 
 declare function tm:incr-decr-new-value($new-field as element(), $dx as xs:integer, $dy as xs:integer) as xs:integer {
@@ -368,7 +369,7 @@ declare %updating function tm:move($mover as element(), $dx as xs:integer, $dy a
                 case 'mover-incr-decr' return
                 (
                     let $updated-mover-value := $mover-value + tm:incr-decr-new-value($new-field, $dx, $dy)
-                    return 
+                    return
                     if ($updated-mover-value ge 0 and $updated-mover-value lt 10) then
                         tm:normal-move($mover, $updated-mover-value, $x, $y)
                     else
@@ -377,7 +378,7 @@ declare %updating function tm:move($mover as element(), $dx as xs:integer, $dy a
                 case 'four-arrows' return
                 (
                     let $updated-mover-value := $mover-value + tm:four-arrows-new-value($dx, $dy)
-                    return 
+                    return
                     if ($updated-mover-value ge 0 and $updated-mover-value lt 10) then
                         tm:normal-move($mover, $updated-mover-value, $x, $y)
                     else
@@ -402,6 +403,18 @@ declare %updating function tm:move($mover as element(), $dx as xs:integer, $dy a
         )
 };
 
+declare function tm:reload() {
+    b:navigate-to(concat("?level=", $levelnr))
+};
+
+declare function tm:prev-level() {
+    if ($levelnr gt 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()
+};
+
+declare function tm:next-level() {
+    if ($levelnr lt 59) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()
+};
+
 declare %updating function tm:keydown() {
   let $key := trace(b:get($event, 'key'))
       , $mover := $leveldoc/tm:level/tm:field[@type = 'mover'][@selected = 'true']
@@ -410,8 +423,9 @@ declare %updating function tm:keydown() {
     if ($key = 'ArrowRight') then tm:move($mover, 1, 0) else
     if ($key = 'ArrowUp') then tm:move($mover, 0, -1) else
     if ($key = 'ArrowDown') then tm:move($mover, 0, 1) else
-    if ($key = 'n') then (if ($levelnr lt 59) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
-    if ($key = 'p') then (if ($levelnr gt 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
+    if ($key = 'n') then tm:next-level() else
+    if ($key = 'p') then tm:prev-level() else
+    if ($key = 'r') then tm:reload() else
     (
         let
             $next-mover := $mover/following-sibling::tm:field[@type = 'mover'][1]
@@ -428,7 +442,7 @@ declare %updating function tm:pointerdown() {
         , $y := xs:double($coords/@y)
         , $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
 		, $current-mover := $movers[@selected = true()]
-        , $hfm := trace($leveldoc/tm:level/@pointerDown, "pointerDown")
+        , $pointerDown := trace($leveldoc/tm:level/@pointerDown, "pointerDown @ tm:pointerdown")
 		, $id := $g/@id
 		, $new-mover := $movers[@id = $id]
 	return
@@ -443,11 +457,12 @@ declare %updating function tm:pointerdown() {
 };
 
 declare %updating function tm:pointerup() {
-	let 
-        $pointerDown := trace(xs:boolean($leveldoc/tm:level/@pointerDown), "pointerDown")
+	let
+        $pointerDown := trace(xs:boolean($leveldoc/tm:level/@pointerDown), "pointerDown @ tm:pointerup")
         , $downX := trace($leveldoc/tm:level/@downX, "downX")
         , $downY := trace($leveldoc/tm:level/@downY, "downY")
 		, $movers := $leveldoc/tm:level/tm:field[@type = 'mover']
+        , $target := trace(b:get($event, 'target')/name(), "target")
         , $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
         , $x := xs:double($coords/@x)
         , $y := xs:double($coords/@y)
@@ -461,7 +476,7 @@ declare %updating function tm:pointerup() {
         if ($pointerDown) then
         (
             replace value of node $leveldoc/tm:level/@pointerDown with "false",
-            if ($abs-dx lt 5 and $abs-dy lt 5) then
+            if ($abs-dx lt 2 and $abs-dy lt 2) then
                 ()
             else if ($abs-dx gt $abs-dy) then
                 tm:move($current-mover, if ($dx gt 0) then 1 else -1, 0)
@@ -474,13 +489,24 @@ declare %updating function tm:pointerup() {
 };
 
 declare %updating function tm:add-listeners() {
-	b:addEventListener(b:dom()//svg:svg, "keydown", "tm:keydown()"),
-	for $g as element() in b:dom()//svg:g
-	return
-	(
-		b:addEventListener($g, "pointerdown", "tm:pointerdown()"),
-		b:addEventListener($g, "pointerup", "tm:pointerup()")
-	)
+
+    let $svg := b:dom()/svg:svg
+        , $board := $svg/svg:g[@id = 'board']
+        , $btn-reload := $svg/svg:g/svg:g[@id = 'btn-reload']
+        , $btn-prev := $svg/svg:g/svg:g[@id = 'btn-prev']
+        , $btn-next := $svg/svg:g/svg:g[@id = 'btn-next']
+    return (
+        b:addEventListener($svg, "keydown", "tm:keydown()"),
+        for $g as element() in $board/svg:g
+        return
+        (
+            b:addEventListener($g, "pointerdown", "tm:pointerdown()"),
+            b:addEventListener($g, "pointerup", "tm:pointerup()")
+        ),
+        b:addEventListener($btn-reload, "pointerdown", "tm:reload()"),
+        b:addEventListener($btn-prev, "pointerdown", "tm:prev-level()"),
+        b:addEventListener($btn-next, "pointerdown", "tm:next-level()")
+    )
 };
 
 declare function tm:get-level() as xs:integer {
@@ -532,4 +558,36 @@ declare function tm:get-level() as xs:integer {
             <rect fill="current-color" x="1" y="1" width="8" height="8"/>
         </g>
     </defs>
+
+    <g id="board">
+    </g>
+
+    <!-- Button row  -->
+    <g id="controls" font-family="sans-serif" font-size="3.5"
+       text-anchor="middle" pointer-events="all">
+
+        <!-- Previous -->
+        <g id="btn-prev" class="button" cursor="pointer">
+            <rect x="2" y="102" width="16" height="8"
+                  rx="1.5" ry="1.5"
+                  fill="#ddd" stroke="#444" stroke-width="0.2"  />
+            <text x="10" y="107">Prev</text>
+        </g>
+
+        <!-- Reload -->
+        <g id="btn-reload" class="button" cursor="pointer">
+            <rect x="28" y="102" width="16" height="8"
+                  rx="1.5" ry="1.5"
+                  fill="#ddd" stroke="#444" stroke-width="0.2"  />
+            <text x="36" y="107">Reload</text>
+        </g>
+
+        <!-- Next -->
+        <g id="btn-next" class="button" cursor="pointer">
+            <rect x="54" y="102" width="16" height="8"
+                  rx="1.5" ry="1.5"
+                  fill="#ddd" stroke="#444" stroke-width="0.2"  />
+            <text x="62" y="107">Next</text>
+        </g>
+    </g>
 </svg>
