@@ -1,3 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-stylesheet href="style.css" type="text/css"?>
 <svg
   xmlns="http://www.w3.org/2000/svg"
   xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -97,7 +99,10 @@ declare %updating function boxup:update-svg() {
     , $svg := b:dom()/svg:svg
     return
   (
-    replace value of node $svg/@viewBox with concat("-0.1 -0.1 ", $columns + 0.2, " ", $rows + 0.2),
+  insert node attribute pointerDown {"false"} into $boxup-game,
+  insert node attribute downX {"0"} into $boxup-game,
+  insert node attribute downY {"0"} into $boxup-game,
+  replace value of node $svg/@viewBox with concat("-0.1 -0.1 ", $columns + 0.2, " ", $rows + 0.2),
     replace node $svg/svg:title/text() with concat("Box Up level ", $levelnr),
     insert node boxup:get-body($boxup-game) as last into $svg
   )
@@ -206,6 +211,60 @@ declare function boxup:get-level() as xs:integer {
             1
 };
 
+declare function boxup:reload() {
+    b:navigate-to(concat("?level=", $levelnr))
+};
+
+declare function boxup:prev-level() {
+    if ($levelnr gt 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()
+};
+
+declare function boxup:next-level() {
+    if ($levelnr lt 6) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()
+};
+
+declare %updating function boxup:pointerdown() {
+	let
+    $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+    , $x := xs:double($coords/@x)
+    , $y := xs:double($coords/@y)
+	return
+    (
+      replace value of node $leveldoc/boxup:boxup/@pointerDown with "true",
+      replace value of node $leveldoc/boxup:boxup/@downX with $x,
+      replace value of node $leveldoc/boxup:boxup/@downY with $y
+    )
+};
+
+declare %updating function boxup:pointerup() {
+	let
+    $pointerDown := xs:boolean($leveldoc/boxup:boxup/@pointerDown)
+    , $downX := $leveldoc/boxup:boxup/@downX
+    , $downY := $leveldoc/boxup:boxup/@downY
+    , $coords := b:getSVGcoordinates($event, b:dom()/svg:svg)
+    , $x := xs:double($coords/@x)
+    , $y := xs:double($coords/@y)
+    , $dx := $x - $downX
+    , $dy := $y - $downY
+    , $abs-dx := abs($dx)
+    , $abs-dy := abs($dy)
+	return
+    (
+        if ($pointerDown) then
+          (
+              replace value of node $leveldoc/boxup:boxup/@pointerDown with "false",
+              if ($abs-dx lt 0.2 and $abs-dy lt 0.2) then
+                  ()
+              else if ($abs-dx gt $abs-dy) then
+                  boxup:check-move(if ($dx gt 0) then 1 else -1, 0)
+              else
+                  boxup:check-move(0, if ($dy gt 0) then 1 else -1)
+          )
+        else
+          ()
+    )
+};
+
 declare %updating function boxup:keydown-svg() {
   let $key := trace(b:get($event, 'key'))
 
@@ -214,13 +273,19 @@ declare %updating function boxup:keydown-svg() {
     if ($key = 'ArrowRight') then boxup:check-move(1, 0) else
     if ($key = 'ArrowUp') then boxup:check-move(0, -1) else
     if ($key = 'ArrowDown') then boxup:check-move(0, 1) else
-    if ($key = 'n') then (if ($levelnr < 6) then b:navigate-to(concat("?level=", $levelnr + 1)) else ()) else
-    if ($key = 'p') then (if ($levelnr > 1) then b:navigate-to(concat("?level=", $levelnr - 1)) else ()) else
+    if ($key = 'n') then boxup:next-level() else
+    if ($key = 'p') then boxup:prev-level() else
+    if ($key = 'r') then boxup:reload() else
     ()
 };
 
 declare %updating function boxup:add-listeners() {
-  b:addEventListener(b:dom()//svg:svg, "keydown", "boxup:keydown-svg()")
+  let $svg := b:dom()/svg:svg
+  return (
+    b:addEventListener($svg, "keydown", "boxup:keydown-svg()"),
+    b:addEventListener($svg, "pointerdown", "boxup:pointerdown()"),
+    b:addEventListener($svg, "pointerup", "boxup:pointerup()")
+  )
 };
 
 ]]>
