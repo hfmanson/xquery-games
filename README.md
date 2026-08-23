@@ -31,3 +31,6 @@ SVG games using a XQuery Update Facility game engine based on [xfontopath](https
  
  ## Build for deployment
      node build.js
+
+ ## Debugging
+     npm run start
